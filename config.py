@@ -7,7 +7,7 @@ parser.add_argument("--mode", type=str, choices=["train", "valid", "test"], defa
 parser.add_argument("--model", type=str, default="light_gcn")
 parser.add_argument("--layer", type=int, default=3, help="layer num of GCN")
 parser.add_argument("--dim", type=int, default=64, help='dimensionality of atom features')
-parser.add_argument("--k", default="[10, 20, 50]")
+parser.add_argument("--k_list", default="[10, 20, 50]")
 # Log Parameters
 parser.add_argument("--log", type=bool, default=True, help="enable logging")
 parser.add_argument("--log_dir", type=str, default="./logs", help="Dir for logs")
