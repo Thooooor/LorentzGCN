@@ -27,6 +27,9 @@ class LightGCN(torch.nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout
 
+        if alpha is None:
+            alpha = 1. / (num_layers + 1)
+
         if isinstance(alpha, Tensor):
             assert alpha.size(0) == num_layers + 1
         else:
@@ -73,6 +76,35 @@ class LightGCN(torch.nn.Module):
 
         return out
 
+    def bpr_loss(self, edge_index: Adj, neg_edge_index: Adj):
+        """
+
+        :param edge_index:
+        :param neg_edge_index:
+        :return:
+        """
+        pos_out = self.forward(edge_index)
+        neg_out = self.forward(neg_edge_index)
+
+        loss = - torch.log(torch.sigmoid(pos_out - neg_out)).mean()
+        return loss
+
+    def recommend(self, edge_index: Adj, k: int = 10):
+        """
+
+        :param k:
+        :param edge_index:
+        :return:
+        """
+        out = self.get_embedding(edge_index)
+        user_out = out[:self.num_users]
+        item_out = out[self.num_users:]
+
+        scores = user_out @ item_out.t()
+        _, indices = torch.topk(scores, k=k, dim=-1)
+
+        return indices
+
 
 class LightConv(MessagePassing, ABC):
     def __init__(self, normalize=True, **kwargs):
@@ -80,7 +112,17 @@ class LightConv(MessagePassing, ABC):
         super(LightConv, self).__init__(**kwargs)
         self.normalize = normalize
 
+    def reset_parameters(self):
+        pass
+
     def forward(self, x: Tensor, edge_index: Adj, edge_weight: OptTensor = None) -> Tensor:
+        """
+
+        :param x:
+        :param edge_index:
+        :param edge_weight:
+        :return:
+        """
         if self.normalize and isinstance(edge_index, Tensor):
             out = gcn_norm(edge_index, edge_weight, x.size(self.node_dim),
                            add_self_loops=False, flow=self.flow, dtype=x.dtype)
@@ -93,11 +135,21 @@ class LightConv(MessagePassing, ABC):
         return self.propagate(edge_index, x=x, edge_weight=edge_weight, size=None)
 
     def message(self, x_j: Tensor, edge_weight: OptTensor = None) -> Tensor:
-        """Message function for LightGCN."""
+        """
+
+        :param x_j:
+        :param edge_weight:
+        :return:
+        """
         if edge_weight is not None:
             return edge_weight.view(-1, 1) * x_j
         return x_j
 
     def message_and_aggregate(self, adj_t: SparseTensor, x: Tensor = None) -> Tensor:
-        """Message and aggregate function for LightGCN."""
+        """
+
+        :param adj_t:
+        :param x:
+        :return:
+        """
         return spmm(adj_t, x, self.node_dim, self.node_dim)
