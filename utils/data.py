@@ -52,6 +52,7 @@ class Taobao(Dataset, ABC):
         self.test_size = 0
         self.valid_size = 0
 
+        # Training data processing
         fr = open(train_file, 'rb')
         train_data = pickle.load(fr)
         fr.close()
@@ -63,6 +64,7 @@ class Taobao(Dataset, ABC):
             self.num_items = max(self.num_items, max(items))
         self.train_unique_users = torch.tensor(list(train_data.keys()), dtype=torch.long)
 
+        # Validation data processing
         fr = open(valid_file, 'rb')
         valid_data = pickle.load(fr)
         fr.close()
