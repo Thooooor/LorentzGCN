@@ -1,11 +1,12 @@
 from time import time
-
 import numpy as np
-from torch import Tensor
 
 
 class AverageRecord(object):
-    """Computes and stores the average and current value"""
+    """
+    Compute and store the average and current value
+    """
+
     def __init__(self):
         self.val = 0.0
         self.avg = 0.0
@@ -19,8 +20,11 @@ class AverageRecord(object):
         self.avg = self.sum / self.count
 
 
-# Metrics class includes Recall@K, NDCG@K
 class Metrics:
+    """
+    Compute metrics for evaluation
+    """
+
     def __init__(self, k_list: list, split: str = "valid"):
         self.start_time = time()
         self.split = split
@@ -33,28 +37,40 @@ class Metrics:
         self.ndcg = None
 
     def update(self, y_pred, y_true):
+        """
+        Update y_pred and y_true
+        :param y_pred:
+        :param y_true:
+        :return:
+        """
         if self.y_pred is None:
-            self.y_pred = y_pred
-            self.y_true = y_true
+            self.y_pred = np.array(y_pred)
+            self.y_true = np.array(y_true)
         else:
-            self.y_pred = np.concatenate((self.y_pred, y_pred))
-            self.y_true = np.concatenate((self.y_true, y_true))
-        self.compute_metrics()
+            self.y_pred = np.concatenate((self.y_pred, np.array(y_pred)), axis=0)
+            self.y_true = np.array(self.y_true.tolist() + y_true)
 
     def compute_metrics(self):
+        """Compute recall and ndcg"""
+        self.get_pred_label()
         self.recall = []
         self.ndcg = []
         for k in self.k_list:
             self.recall.append(recall_at_k(self.y_true, self.y_pred, k))
             self.ndcg.append(ndcg_at_k(self.y_true, self.y_pred, k))
 
+    def get_pred_label(self):
+        """Convert prediction to label"""
+        for i in range(self.y_pred.shape[0]):
+            self.y_pred[i] = np.array(list(map(lambda x: 1 if x in self.y_true[i] else 0, self.y_pred[i])))
+
     def format_metrics(self):
+        """Format metrics to string"""
         result = "{} ".format(self.split)
         for i, k in enumerate(self.k_list):
-            result += "Recall@{}: {:.2%} | ".format(k, self.recall[i])
-            result += "NDCG@{}: {:.2%} | ".format(k, self.ndcg[i])
+            result += "Recall@{}: {:.2} | ".format(k, self.recall[i])
+            result += "NDCG@{}: {:.2} | ".format(k, self.ndcg[i])
         result += "Time: {:.2f}s".format(time() - self.start_time)
-
         return result
 
     def to_dict(self):
@@ -69,51 +85,50 @@ class Metrics:
         return self.to_dict()
 
     def __repr__(self):
-        return self.to_dict()
+        return self.format_metrics()
 
     def __getitem__(self, item):
         return self.metrics[item]
 
 
-# recall@k
-def recall_at_k(y_true: Tensor, y_pred: Tensor, k):
+def recall_at_k(y_true, y_pred, k):
     """
+    Recall at rank K
 
-    :param y_true: shape: (batch_size, num_items)
-    :param y_pred: shape: (batch_size, num_items)
+    :param y_true:
+    :param y_pred: shape: (num_users, top_k)
     :param k:
     :return:
     """
-    print(y_true.shape, y_pred.shape)
-    y_true = y_true.numpy()
-    y_pred = y_pred.numpy()
-    y_pred = y_pred.argsort()[:, -k:]
-    y_pred = np.flip(y_pred, axis=1)
-    y_true = y_true.argsort()[:, -k:]
-    y_true = np.flip(y_true, axis=1)
-    recall = 0
-    for i in range(k):
-        recall += np.sum(y_true[:, i] == y_pred[:, i]) / k
+    y_pred_right = y_pred[:, :k].sum(axis=1)
+
+    recall_n = np.array([len(y_true[i]) for i in range(len(y_true))])
+    recall = np.mean(y_pred_right / recall_n)
+
     return recall
 
 
-# ndcg@k
-def ndcg_at_k(y_true: Tensor, y_pred: Tensor, k):
+def ndcg_at_k(y_true, y_pred, k):
     """
     Normalized discounted cumulative gain (NDCG) at rank K
 
-    :param y_true: shape: (batch_size, num_items)
-    :param y_pred:
+    :param y_true:
+    :param y_pred: shape: (num_users, top_k)
     :param k:
     :return:
     """
-    y_true = y_true.numpy()
-    y_pred = y_pred.numpy()
-    y_pred = y_pred.argsort()[:, -k:]
-    y_pred = np.flip(y_pred, axis=1)
-    y_true = y_true.argsort()[:, -k:]
-    y_true = np.flip(y_true, axis=1)
-    ndcg = 0
-    for i in range(k):
-        ndcg += np.sum(y_true[:, i] == y_pred[:, i]) / np.log2(i + 2)
-    return ndcg / k
+    y_pred = y_pred[:, :k]
+    true_matrix = np.zeros((y_pred.shape[0], k))
+
+    for i, items in enumerate(y_true):
+        length = k if len(items) > k else len(items)
+        true_matrix[i, :length] = 1
+
+    idcg = np.sum(true_matrix / np.log2(np.arange(2, true_matrix.shape[1] + 2)), axis=1)
+    dcg = y_pred * (1.0 / np.log2(np.arange(2, y_pred.shape[1] + 2)))
+    dcg = np.sum(dcg, axis=1)
+    idcg[idcg == 0] = 1.
+    ndcg = dcg / idcg
+    ndcg[np.isnan(ndcg)] = 0.
+
+    return np.mean(ndcg)
