@@ -6,9 +6,10 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.typing import Adj, SparseTensor, OptTensor
 from torch_geometric.utils import spmm
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
+from .base import Base
 
 
-class LightGCN(torch.nn.Module):
+class LightGCN(Base):
     """LightGCN model."""
 
     def __init__(
@@ -17,28 +18,23 @@ class LightGCN(torch.nn.Module):
             num_items: int,
             embedding_size=64,
             num_layers=3,
-            dropout=0.2,
             alpha=None
     ):
-        super(LightGCN, self).__init__()
-
-        self.num_users = num_users
-        self.num_items = num_items
-        self.num_nodes = num_users + num_items
-        self.embedding_dim = embedding_size
-        self.num_layers = num_layers
-        self.dropout = dropout
+        super(LightGCN, self).__init__(
+            num_users=num_users,
+            num_items=num_items,
+            embedding_size=embedding_size,
+            num_layers=num_layers,
+        )
 
         if alpha is None:
             alpha = 1. / (num_layers + 1)
-
         if isinstance(alpha, Tensor):
             assert alpha.size(0) == num_layers + 1
         else:
             alpha = torch.tensor([alpha] * (num_layers + 1))
         self.register_buffer('alpha', alpha)
 
-        self.embedding = torch.nn.Embedding(self.num_nodes, embedding_size)
         self.convs = torch.nn.ModuleList([LightConv() for _ in range(self.num_layers)])
 
         self.reset_parameters()
@@ -59,6 +55,7 @@ class LightGCN(torch.nn.Module):
 
         out_src = out[edge_index[0]]
         out_dst = out[edge_index[1]]
+
         return (out_src * out_dst).sum(dim=-1)
 
     def get_embedding(self, edge_index: Adj):
@@ -75,48 +72,6 @@ class LightGCN(torch.nn.Module):
             out = out + x * self.alpha[i + 1]
 
         return out
-
-    def bpr_loss(self, edge_index: Adj, neg_edge_index: Adj):
-        """
-        Bayesian Personalized Ranking loss.
-        :param edge_index: [2, num_edges]
-        :param neg_edge_index: [2, num_edges]
-        :return: loss value
-        """
-        pos_out = self.forward(edge_index)
-        neg_out = self.forward(neg_edge_index)
-
-        loss = - torch.log(torch.sigmoid(pos_out - neg_out)).mean()
-
-        return loss
-
-    def recommend(self, user_ids: Tensor, top_k=10):
-        """
-        Recommend top-k items for given users.
-        :param user_ids: [num_users]
-        :param top_k: int
-        :return: [num_users, top_k]
-        """
-        user_embeddings = self.embedding(user_ids)
-        item_embeddings = self.embedding.weight[self.num_users:]
-
-        scores = user_embeddings @ item_embeddings.t()
-        _, indices = scores.topk(top_k, dim=-1)
-
-        return indices
-
-    def get_user_rating(self, user_ids: Tensor):
-        """
-        Get rating scores of all items for given users.
-        :param user_ids: [num_users]
-        :return: [num_users, num_items]
-        """
-        user_embeddings = self.embedding(user_ids)
-        item_embeddings = self.embedding.weight[self.num_users:]
-
-        scores = user_embeddings @ item_embeddings.t()
-
-        return scores
 
 
 class LightConv(MessagePassing, ABC):
