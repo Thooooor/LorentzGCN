@@ -33,7 +33,7 @@ def main():
     logging.info("Loading {} dataset".format(args.dataset))
     start = time()
 
-    dataset = Taobao(args.data_dir)
+    dataset = Taobao(args.data_dir, args.batch_size)
     train_loader = dataset.train_loader
     valid_loader = dataset.valid_loader
     test_loader = dataset.test_loader
@@ -117,9 +117,14 @@ def train(train_loader, model, optimizer):
     :return:
     """
     train_loss = AverageRecord()
+    model.cuda()
     model.train()
     with tqdm(total=len(train_loader)) as bar:
         for users, pos_items, neg_items in train_loader:
+            users = users.cuda()
+            pos_items = pos_items.cuda()
+            neg_items = neg_items.cuda()
+            # compute loss
             edge_index = torch.stack([users, pos_items], dim=0)
             neg_edge_index = torch.stack([users, neg_items], dim=0)
             loss = model.bpr_loss(edge_index, neg_edge_index)
@@ -138,20 +143,21 @@ def train(train_loader, model, optimizer):
 def evaluate(data_loader, model, k_list, split="valid"):
     """
 
-    :param k_list:
-    :param split:
     :param data_loader:
     :param model:
+    :param k_list:
+    :param split:
     :return:
     """
     eval_metric = Metrics(k_list, split)
     model.eval()
     with torch.no_grad():
-        for users, pos_items in data_loader:
-            edge_index = torch.stack([users, pos_items], dim=0)
-            pred_items = model.recommend(edge_index, k=max(k_list))
-            eval_metric.update(pred_items, pos_items)
-
+        for users in data_loader:
+            users = users.cuda()
+            pos_items = data_loader.dataset.get_items(users)
+            pred_items = model.recommend(users, top_k=max(k_list))
+            eval_metric.update(pred_items.cpu(), pos_items)
+    eval_metric.compute_metrics()
     return eval_metric
 
 
