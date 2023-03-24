@@ -2,7 +2,10 @@
 
 ## TODO:
 
-- [ ] Fix Evaluation Metrics and valid/test dataset
+- [x] Fix Evaluation Metrics and valid/test dataset
+- [ ] Fix BPR Loss function
+- [ ] Add NDCG model
+- [ ] LorentzGCN
 
 ## Run
 ```shell
