@@ -66,7 +66,7 @@ class Metrics:
 
     def format_metrics(self):
         """Format metrics to string"""
-        result = "{} ".format(self.split)
+        result = ""
         for i, k in enumerate(self.k_list):
             result += "Recall@{}: {:.2} | ".format(k, self.recall[i])
             result += "NDCG@{}: {:.2} | ".format(k, self.ndcg[i])
