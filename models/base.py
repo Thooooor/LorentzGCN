@@ -77,9 +77,12 @@ class Base(torch.nn.Module):
         pos_scores = self.forward(edge_index)
         neg_scores = self.forward(neg_edge_index)
 
-        log_prob = F.logsigmoid(-(pos_scores - neg_scores)).mean()
-        return -log_prob + lambda_reg * self.regularization_loss
-        # return (pos_scores - neg_scores).sum()
+        # log_prob = F.logsigmoid(-(pos_scores - neg_scores)).mean()
+        # return -log_prob + lambda_reg * self.regularization_loss
+
+        loss = pos_scores - neg_scores
+        loss[loss < 0] = 0
+        return loss.sum()
 
     @property
     def regularization_loss(self):
@@ -92,13 +95,12 @@ class Base(torch.nn.Module):
         :param top_k: int
         :return: [num_users, top_k]
         """
-        user_embeddings = self.embedding(user_ids)
-        item_embeddings = self.embedding.weight[self.num_users:]
-
-        scores = user_embeddings @ item_embeddings.t()
+        scores = self.get_user_rating(user_ids)
         _, indices = scores.topk(top_k, dim=-1)
 
-        return indices
+        dst_index = indices + self.num_users
+
+        return dst_index
 
     def get_user_rating(self, user_ids: Tensor):
         """
@@ -107,8 +109,8 @@ class Base(torch.nn.Module):
         :return: [num_users, num_items]
         """
         all_embeddings = self.compute_embedding()
-        user_embeddings = all_embeddings(user_ids)
-        item_embeddings = all_embeddings.weight[self.num_users:]
+        user_embeddings = all_embeddings[user_ids]
+        item_embeddings = all_embeddings[self.num_users:]
 
         scores = user_embeddings @ item_embeddings.t()
 
