@@ -1,10 +1,10 @@
 import pickle
 from abc import ABC
 
+import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch_geometric.data import Data
-from torch_geometric.utils import structured_negative_sampling
 
 
 class EdgeDataset(Dataset, ABC):
@@ -17,24 +17,19 @@ class EdgeDataset(Dataset, ABC):
             edge_index: torch.Tensor,
             data_size: int,
             split: str = "train",
+            num_negatives: int = 1,
     ):
         super().__init__()
+        self.num_negatives = num_negatives
         self.data_size = data_size
         self.split = split
-
-        if self.split == "train":
-            self.edge_index = torch.stack(structured_negative_sampling(edge_index))
-        else:
-            self.edge_index = edge_index
+        self.edge_index = edge_index
 
     def __len__(self):
         return self.data_size
 
     def __getitem__(self, idx):
-        if self.split == "train":
-            return self.edge_index[0][idx], self.edge_index[1][idx], self.edge_index[2][idx]
-        else:
-            return self.edge_index[0][idx], self.edge_index[1][idx]
+        return self.edge_index[0][idx], self.edge_index[1][idx], self.edge_index[2][idx]
 
 
 class UserDataset(Dataset, ABC):
@@ -62,15 +57,16 @@ class UserDataset(Dataset, ABC):
     def __getitem__(self, idx):
         return self.users[idx]
 
-    def get_items(self, users):
+    def get_items(self, users, num_users):
         """
         Get items for users
+        :param num_users: 
         :param users:
         :return:
         """
         items = []
         for user in users:
-            items.append(self.data[int(user)])
+            items.append([item_id + num_users for item_id in self.data[user]])
 
         return items
 
@@ -78,8 +74,9 @@ class UserDataset(Dataset, ABC):
 class Taobao(Dataset, ABC):
     """Taobao dataset"""
 
-    def __init__(self, path, batch_size=128):
+    def __init__(self, path, batch_size=128, num_negatives=1):
         super().__init__()
+        self.num_negatives = num_negatives
         self.batch_size = batch_size
         self.path = path
         self.num_users = 0
@@ -128,15 +125,40 @@ class Taobao(Dataset, ABC):
         # Item index starts from num_users
         self.train_user = torch.tensor(train_user, dtype=torch.long)
         self.train_item = torch.tensor(train_item, dtype=torch.long) + self.num_users
-        self._train_edge_index = torch.tensor([train_user, train_item], dtype=torch.long)
+        self._train_edge_index = torch.stack([self.train_user, self.train_item], dim=0)
 
         self.valid_user = torch.tensor(valid_user, dtype=torch.long)
         self.valid_item = torch.tensor(valid_item, dtype=torch.long) + self.num_users
-        self._valid_edge_index = torch.tensor([valid_user, valid_item], dtype=torch.long)
+        self._valid_edge_index = torch.stack([self.valid_user, self.valid_item], dim=0)
 
         self.test_user = torch.tensor(test_user, dtype=torch.long)
         self.test_item = torch.tensor(test_item, dtype=torch.long) + self.num_users
-        self._test_edge_index = torch.tensor([test_user, test_item], dtype=torch.long)
+        self._test_edge_index = torch.stack([self.test_user, self.test_item], dim=0)
+
+    def structured_negative_sampling(self):
+        """
+        Structured negative sampling
+        :return:
+        """
+        i, j = self._train_edge_index.long()
+        idx_1 = i * self.num_items + j
+        i = i.repeat(self.num_negatives)
+        k = torch.randint(self.num_users, self.num_nodes, (i.size(0),), dtype=torch.long)  # (e*t)
+        idx_2 = i * self.num_nodes + k
+
+        mask = torch.from_numpy(np.isin(idx_2, idx_1)).to(torch.bool)  # (e*t,)
+        rest = mask.nonzero(as_tuple=False).view(-1)
+        while rest.numel() > 0:  # pragma: no cover
+            # sample from the item set
+            tmp = torch.randint(self.num_users, self.num_nodes, (rest.numel(),), dtype=torch.long)
+            idx_2 = i[rest] * self.num_nodes + tmp
+            mask = torch.from_numpy(np.isin(idx_2, idx_1)).to(torch.bool)
+            k[rest] = tmp
+            rest = rest[mask.nonzero(as_tuple=False).view(-1)]
+
+        assert k.min() > self.num_users - 1 and k.max() < self.num_nodes
+
+        return self._train_edge_index[0], self._train_edge_index[1], k
 
     @property
     def train_edge_index(self):
@@ -185,7 +207,9 @@ class Taobao(Dataset, ABC):
 
     @property
     def train_set(self):
-        return EdgeDataset(self.train_edge_index, self.train_size, split="train")
+        users, pos_items, neg_items = self.structured_negative_sampling()
+        sampled_edge_index = torch.stack([users, pos_items, neg_items], dim=0)
+        return EdgeDataset(sampled_edge_index, self.train_size, split="train")
 
     @property
     def valid_set(self):
