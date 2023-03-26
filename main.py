@@ -48,7 +48,8 @@ def main():
     logging.info("Building models costs {: .2f}s".format(time() - start))
 
     # define optimizer
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
 
     # train process
     best_epoch = 0
@@ -120,9 +121,9 @@ def train(train_loader, model, optimizer):
     model.train()
     with tqdm(total=len(train_loader)) as bar:
         for users, pos_items, neg_items in train_loader:
-            users = users.cuda()
-            pos_items = pos_items.cuda()
-            neg_items = neg_items.cuda()
+            # users = users.cuda()
+            # pos_items = pos_items.cuda()
+            # neg_items = neg_items.cuda()
             # compute loss
             edge_index = torch.stack([users, pos_items], dim=0)
             neg_edge_index = torch.stack([users, neg_items], dim=0)

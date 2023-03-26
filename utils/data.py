@@ -55,7 +55,7 @@ class UserDataset(Dataset, ABC):
         return self.data_size
 
     def __getitem__(self, idx):
-        return self.users[idx]
+        return torch.tensor(self.users[idx], dtype=torch.long)
 
     def get_items(self, users, num_users):
         """
@@ -65,8 +65,9 @@ class UserDataset(Dataset, ABC):
         :return:
         """
         items = []
+
         for user in users:
-            items.append([item_id + num_users for item_id in self.data[user]])
+            items.append([item_id + num_users for item_id in self.data[int(user)]])
 
         return items
 
