@@ -1,1 +1,6 @@
 /test.py
+/__pycache__/
+/logs/
+/layers/__pycache__/
+/models/__pycache__/
+/utils/__pycache__/
