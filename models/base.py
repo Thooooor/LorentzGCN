@@ -77,10 +77,23 @@ class Base(torch.nn.Module):
         pos_scores = self.forward(edge_index)
         neg_scores = self.forward(neg_edge_index)
 
-        # log_prob = F.logsigmoid(-(pos_scores - neg_scores)).mean()
-        # return -log_prob + lambda_reg * self.regularization_loss
+        log_prob = F.logsigmoid(-(pos_scores - neg_scores)).mean()
+        return -log_prob + lambda_reg * self.regularization_loss
 
-        loss = pos_scores - neg_scores
+
+    def margin_loss(self, edge_index: Adj, neg_edge_index: Adj, margin: float = 0.1):
+        """
+        Margin-based loss.
+        :param edge_index: [2, num_edges]
+        :param neg_edge_index: [2, num_edges]
+        :param margin: float
+        
+        :return: float
+        """
+        pos_scores = self.forward(edge_index)
+        neg_scores = self.forward(neg_edge_index)
+        
+        loss = pos_scores - neg_scores + margin
         loss[loss < 0] = 0
         return loss.sum()
 

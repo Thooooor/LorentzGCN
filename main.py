@@ -121,13 +121,10 @@ def train(train_loader, model, optimizer):
     model.train()
     with tqdm(total=len(train_loader)) as bar:
         for users, pos_items, neg_items in train_loader:
-            # users = users.cuda()
-            # pos_items = pos_items.cuda()
-            # neg_items = neg_items.cuda()
             # compute loss
             edge_index = torch.stack([users, pos_items], dim=0)
             neg_edge_index = torch.stack([users, neg_items], dim=0)
-            loss = model.bpr_loss(edge_index, neg_edge_index)
+            loss = model.margin_loss(edge_index, neg_edge_index)
             # compute gradient
             optimizer.zero_grad()
             loss.backward()
