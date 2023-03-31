@@ -22,7 +22,7 @@ class LightGCN(Base):
             num_users=num_users,
             num_items=num_items,
             graph=graph,
-            embedding_size=embedding_size,
+            embedding_dim=embedding_size,
             num_layers=num_layers,
         )
 

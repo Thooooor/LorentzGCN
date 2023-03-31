@@ -15,7 +15,7 @@ class Base(torch.nn.Module):
             num_users: int,
             num_items: int,
             graph,
-            embedding_size=64,
+            embedding_dim=64,
             num_layers=3,
             num_negatives=1
     ):
@@ -26,9 +26,9 @@ class Base(torch.nn.Module):
         self.num_users = num_users
         self.num_items = num_items
         self.num_nodes = num_users + num_items
-        self.embedding_dim = embedding_size
+        self.embedding_dim = embedding_dim
         self.num_layers = num_layers
-        self.embedding = torch.nn.Embedding(self.num_nodes, embedding_size)
+        self.embedding = torch.nn.Embedding(self.num_nodes, embedding_dim)
         self.adj_mat = torch.ones((self.num_nodes, self.num_nodes))
         self.adj_mat[self.num_users:, self.num_users:] = 0
 
@@ -115,16 +115,22 @@ class Base(torch.nn.Module):
 
         return dst_index
 
-    def get_user_rating(self, user_ids: Tensor):
+    def get_user_rating(self):
         """
         Get rating scores of all items for given users.
         :param user_ids: [num_users]
         :return: [num_users, num_items]
         """
-        all_embeddings = self.compute_embedding()
-        user_embeddings = all_embeddings[user_ids]
-        item_embeddings = all_embeddings[self.num_users:]
+        out = self.compute_embedding()
+        probs_matrix = np.zeros((self.num_users, self.num_items))
+        
+        for user in range(self.num_users):
+            user_embedding = out[user]
+            user_embedding = user_embedding.repeat(self.num_items).view(self.num_items, -1)
+            item_embeddings = out[np.arange(self.num_users, self.num_nodes), :]
+            sqdist = self.manifold.sqdist(user_embedding, item_embeddings, self.c)
 
-        scores = user_embeddings @ item_embeddings.t()
-
-        return scores
+            probs = sqdist.detach().cpu().numpy() * -1
+            probs_matrix[user] = np.reshape(probs, [-1, ])
+            
+        return probs_matrix
