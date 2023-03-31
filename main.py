@@ -9,7 +9,7 @@ import wandb
 from tqdm import tqdm
 
 from config import parser
-from models import LightGCN, HGCF
+from models import ALL_MODELS
 from optimizers.rsgd import RiemannianSGD
 from utils import set_up_logger, Taobao, AverageRecord, Metrics, set_seed, set_device
 
@@ -46,7 +46,7 @@ def main():
     start = time()
 
     # model = LightGCN(dataset.num_users, dataset.num_items, dataset.adj_train_norm, args.dim, args.layer)
-    model = HGCF(dataset.num_users, dataset.num_items, dataset.adj_train_norm)
+    model = ALL_MODELS[args.model](dataset.num_users, dataset.num_items, dataset.adj_train_norm)
     
     logging.info("Building models costs {: .2f}s".format(time() - start))
 

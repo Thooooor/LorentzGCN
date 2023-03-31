@@ -1,10 +1,11 @@
 import argparse
+from models import ALL_MODELS
 
 
 parser = argparse.ArgumentParser(description='LorentzGCN')
 parser.add_argument("--mode", type=str, choices=["train", "valid", "test"], default="train")
 # Model Parameters
-parser.add_argument("--model", type=str, default="light_gcn")
+parser.add_argument("--model", type=str, choices=list(ALL_MODELS.keys()), default="light_gcn")
 parser.add_argument("--layer", type=int, default=3, help="layer num of GCN")
 parser.add_argument("--dim", type=int, default=64, help='dimensionality of atom features')
 parser.add_argument("--scale", type=float, default=1.0, help='scale of initial embedding')
