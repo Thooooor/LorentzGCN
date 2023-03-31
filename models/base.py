@@ -10,27 +10,18 @@ from torch_geometric.typing import Adj
 class Base(torch.nn.Module):
     """Base class for GNN Recommender System."""
 
-    def __init__(
-            self,
-            num_users: int,
-            num_items: int,
-            graph,
-            embedding_dim=64,
-            num_layers=3,
-            scale=0.1,
-            margin=1.0
-    ):
+    def __init__(self, num_users, num_items, graph, args):
         super(Base, self).__init__()
         self.graph = graph.cuda()
         self.num_users = num_users
         self.num_items = num_items
         self.num_nodes = num_users + num_items
-        self.embedding_dim = embedding_dim
-        self.num_layers = num_layers
-        self.margin = margin
-        self.embedding = torch.nn.Embedding(self.num_nodes, embedding_dim).cuda()
+        self.embedding_dim = args.embedding_dim
+        self.num_layers = args.num_layers
+        self.margin = args.margin
+        self.embedding = torch.nn.Embedding(self.num_nodes, self.embedding_dim).cuda()
         
-        self.reset_parameters(scale)
+        self.reset_parameters(args.scale)
         
     def reset_parameters(self, scale):
         """Reinitialize learnable parameters.

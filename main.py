@@ -4,7 +4,6 @@ import warnings
 from time import time
 
 import torch
-import torch.optim as optim
 import wandb
 from tqdm import tqdm
 

@@ -1,5 +1,6 @@
 import argparse
 from models import ALL_MODELS
+from optimizers import ALL_OPTIMIZERS
 
 
 parser = argparse.ArgumentParser(description='LorentzGCN')
@@ -28,7 +29,7 @@ parser.add_argument("--eval_freq", type=int, default=5)
 parser.add_argument("--batch_size", type=int, default=1024, help='mini-batch size')
 parser.add_argument("--sample_size", type=int, default=-1, help="sample size, -1 to not use sampling")
 # Optimizer Parameters
-parser.add_argument("--optimizer", type=str, choices=["Adagrad", "Adam", "SGD"], default='Adam')
+parser.add_argument("--optimizer", type=str, choices=list(ALL_OPTIMIZERS.keys()), default='Adam')
 parser.add_argument("--lr", type=float, default=1e-3)
 parser.add_argument("--weight_decay", type=float, default=0.005)
 parser.add_argument("--momentum", type=float, default=0.95)
