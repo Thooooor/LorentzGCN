@@ -50,19 +50,20 @@ class Metrics:
             self.y_pred = np.concatenate((self.y_pred, np.array(y_pred)), axis=0)
             self.y_true = np.array(self.y_true.tolist() + y_true)
 
-    def compute_metrics(self):
+    def compute_metrics(self, pred_matrix, ture_dict, user_item_csr):
         """Compute recall and ndcg"""
-        self.get_pred_label()
-        self.recall = []
-        self.ndcg = []
-        for k in self.k_list:
-            self.recall.append(recall_at_k(self.y_true, self.y_pred, k))
-            self.ndcg.append(ndcg_at_k(self.y_true, self.y_pred, k))
-
-    def get_pred_label(self):
-        """Convert prediction to label"""
-        for i in range(self.y_pred.shape[0]):
-            self.y_pred[i] = np.array(list(map(lambda x: 1 if x in self.y_true[i] else 0, self.y_pred[i])))
+        top_k = max(self.k_list)
+        pred_matrix[user_item_csr.nonzero()] = np.NINF
+        
+        ind = np.argpartition(pred_matrix, -top_k)
+        ind = ind[:, -top_k:]
+        arr_ind = pred_matrix[np.arange(len(pred_matrix))[:, None], ind]
+        arr_ind_argsort = np.argsort(arr_ind)[np.arange(len(pred_matrix)), ::-1]
+        pred_list = ind[np.arange(len(pred_matrix))[:, None], arr_ind_argsort]
+        all_ndcg = ndcg_func([*ture_dict.values()], pred_list)
+        
+        self.recall = [recall_at_k(ture_dict, pred_list, k) for k in self.k_list]
+        self.ndcg = [all_ndcg[k-1] for k in self.k_list]
 
     def format_metrics(self):
         """Format metrics to string"""
@@ -100,12 +101,19 @@ def recall_at_k(y_true, y_pred, k):
     :param k:
     :return:
     """
-    y_pred_right = y_pred[:, :k].sum(axis=1)
-
-    recall_n = np.array([len(y_true[i]) for i in range(len(y_true))])
-    recall = np.mean(y_pred_right / recall_n)
-
-    return recall
+    sum_recall = 0.0
+    num_users = len(y_true)
+    true_users = 0
+    
+    for i, v in y_true.items():
+        true_set = set(v)
+        pred_set = set(y_pred[i][:k])
+        if len(true_set) != 0:
+            sum_recall += len(true_set & pred_set) / float(len(true_set))
+            true_users += 1
+            
+    assert num_users == true_users
+    return sum_recall / true_users
 
 
 def ndcg_at_k(y_true, y_pred, k):
@@ -132,3 +140,19 @@ def ndcg_at_k(y_true, y_pred, k):
     ndcg[np.isnan(ndcg)] = 0.
 
     return np.mean(ndcg)
+
+
+def ndcg_func(ground_truths, ranks):
+    result = 0
+    for i, (rank, ground_truth) in enumerate(zip(ranks, ground_truths)):
+        len_rank = len(rank)
+        len_gt = len(ground_truth)
+        idcg_len = min(len_gt, len_rank)
+
+        # calculate idcg
+        idcg = np.cumsum(1.0 / np.log2(np.arange(2, len_rank + 2)))
+        idcg[idcg_len:] = idcg[idcg_len-1]
+
+        dcg = np.cumsum([1.0/np.log2(idx+2) if item in ground_truth else 0.0 for idx, item in enumerate(rank)])
+        result += dcg / idcg
+    return result / len(ranks)

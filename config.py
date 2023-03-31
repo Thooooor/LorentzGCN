@@ -16,17 +16,17 @@ parser.add_argument("--wandb_project", type=str, default="DSAA5009", help="wandb
 # Training Parameters
 parser.add_argument("--random_seed", type=int, default=2020)
 parser.add_argument("--cuda", type=bool, default=True)
-parser.add_argument("--device", type=int, default=0)
+parser.add_argument("--device", type=int, default=4)
 parser.add_argument("--epochs", type=int, default=500)
 parser.add_argument("--patience", type=int, default=-1)
 parser.add_argument("--eval_freq", type=int, default=5)
-parser.add_argument("--batch_size", type=int, default=512, help='mini-batch size')
+parser.add_argument("--batch_size", type=int, default=1024, help='mini-batch size')
 parser.add_argument("--sample_size", type=int, default=-1, help="sample size, -1 to not use sampling")
 # Optimizer Parameters
 parser.add_argument("--optimizer", type=str, choices=["Adagrad", "Adam", "SGD"], default='Adam')
 parser.add_argument("--lr", type=float, default=1e-3)
 parser.add_argument("--weight_decay", type=float, default=0.001)
-parser.add_argument("--momentum", type=float, default=0.9)
+parser.add_argument("--momentum", type=float, default=0.95)
 # Dataset Parameters
 parser.add_argument("--data_dir", type=str, default="./data")
 parser.add_argument("--dataset", type=str, default="taobao")

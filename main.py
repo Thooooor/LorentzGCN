@@ -9,8 +9,9 @@ import wandb
 from tqdm import tqdm
 
 from config import parser
-from models import LightGCN
-from utils import set_up_logger, Taobao, AverageRecord, Metrics
+from models import LightGCN, HGCF
+from optimizers.rsgd import RiemannianSGD
+from utils import set_up_logger, Taobao, AverageRecord, Metrics, set_seed, set_device
 
 warnings.filterwarnings("ignore")
 
@@ -21,6 +22,9 @@ def main():
     # convert k_list from str type to list
     args.k_list = [int(k) for k in args.k_list[1:-1].split(",")]
     saving_path, saving_name = set_up_logger(args)
+    
+    set_device(args.cuda, args.device)
+    set_seed(args.random_seed)
 
     if args.wandb is True:
         wandb.init(
@@ -34,8 +38,6 @@ def main():
     start = time()
 
     dataset = Taobao(args.data_dir, args.batch_size)
-    valid_loader = dataset.valid_loader
-    test_loader = dataset.test_loader
 
     logging.info("Loading data costs {: .2f}s".format(time() - start))
 
@@ -43,14 +45,17 @@ def main():
     logging.info("Building models")
     start = time()
 
-    model = LightGCN(dataset.num_users, dataset.num_items, dataset.train_edge_index, args.dim, args.layer)
-
+    # model = LightGCN(dataset.num_users, dataset.num_items, dataset.train_edge_index, args.dim, args.layer)
+    model = HGCF(dataset.num_users, dataset.num_items, dataset.adj_train_norm)
+    
     logging.info("Building models costs {: .2f}s".format(time() - start))
 
     # define optimizer
     # optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
+    # optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
+    optimizer = RiemannianSGD(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
 
+    
     # train process
     best_epoch = 0
     best_metrics = None
@@ -60,9 +65,10 @@ def main():
     for epoch in range(args.epochs):
         train_loss = train(dataset.train_loader, model, optimizer)
         logging.info("Epoch {} | average train loss: {:.4f}".format(epoch, train_loss))
-        valid_metrics = evaluate(valid_loader, model, args.k_list, split="valid")
+        # valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
 
         if (epoch + 1) % args.eval_freq == 0:
+            valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
             logging.info("Epoch {} | valid metrics: {}".format(epoch, valid_metrics))
             if not best_metrics or valid_metrics["valid NDCG@50"] > best_metrics["valid NDCG@50"]:
                 best_epoch = epoch
@@ -97,9 +103,9 @@ def main():
     model.cuda()
     model.eval()
 
-    valid_metrics = evaluate(valid_loader, model, args.k_list, split="valid")
+    valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
     logging.info("Valid metrics: {}".format(valid_metrics))
-    test_metrics = evaluate(test_loader, model, args.k_list, split="test")
+    test_metrics = evaluate(dataset.test_dict, dataset.user_item_csr, model, args.k_list, split="test")
     logging.info("Test metrics: {}".format(test_metrics))
 
     if args.wandb is True:
@@ -137,7 +143,7 @@ def train(train_loader, model, optimizer):
     return train_loss.avg
 
 
-def evaluate(data_loader, model, k_list, split="valid"):
+def evaluate(eval_dict, user_item_csr, model, k_list, split="valid"):
     """
 
     :param data_loader:
@@ -148,13 +154,8 @@ def evaluate(data_loader, model, k_list, split="valid"):
     """
     eval_metric = Metrics(k_list, split)
     model.eval()
-    with torch.no_grad():
-        for users in data_loader:
-            users = users.cuda()
-            pos_items = data_loader.dataset.get_items(users, model.num_users)
-            pred_items = model.recommend(users, top_k=max(k_list))
-            eval_metric.update(pred_items.cpu(), pos_items)
-    eval_metric.compute_metrics()
+    rating_metrix = model.get_user_rating()
+    eval_metric.compute_metrics(rating_metrix, eval_dict, user_item_csr)
     return eval_metric
 
 
