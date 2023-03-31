@@ -18,7 +18,8 @@ warnings.filterwarnings("ignore")
 def main():
     # initial
     args = parser.parse_args()
-    # convert k_list from str type to list
+    args.embedding_dim = args.dim
+    args.num_layers = args.layers
     args.k_list = [int(k) for k in args.k_list[1:-1].split(",")]
     saving_path, saving_name = set_up_logger(args)
     
@@ -45,7 +46,7 @@ def main():
     start = time()
 
     # model = LightGCN(dataset.num_users, dataset.num_items, dataset.adj_train_norm, args.dim, args.layer)
-    model = ALL_MODELS[args.model](dataset.num_users, dataset.num_items, dataset.adj_train_norm)
+    model = ALL_MODELS[args.model](dataset.num_users, dataset.num_items, dataset.adj_train_norm, args)
     
     logging.info("Building models costs {: .2f}s".format(time() - start))
 

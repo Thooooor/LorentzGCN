@@ -1,15 +1,17 @@
 import argparse
 from models import ALL_MODELS
 from optimizers import ALL_OPTIMIZERS
+from layers import ALL_STACK_LAYERS
 
 
 parser = argparse.ArgumentParser(description='LorentzGCN')
 parser.add_argument("--mode", type=str, choices=["train", "valid", "test"], default="train")
 # Model Parameters
-parser.add_argument("--model", type=str, choices=list(ALL_MODELS.keys()), default="light_gcn")
-parser.add_argument("--layer", type=int, default=3, help="layer num of GCN")
+parser.add_argument("--model", type=str, choices=list(ALL_MODELS.keys()), default="lorentz_gcn")
+parser.add_argument("--layers", type=int, default=4, help="layer num of GCN")
+parser.add_argument("--stack", type=str, choices=list(ALL_STACK_LAYERS.keys()), default="res_sum")
 parser.add_argument("--dim", type=int, default=64, help='dimensionality of atom features')
-parser.add_argument("--scale", type=float, default=1.0, help='scale of initial embedding')
+parser.add_argument("--scale", type=float, default=0.1, help='scale of initial embedding')
 parser.add_argument("--margin", type=float, default=1.0, help='margin for loss')
 parser.add_argument("--c", type=float, default=1.0, help='c for hyperbolic space')
 parser.add_argument("--network", type=str, default="resSumGCN", help="network type")
@@ -31,7 +33,7 @@ parser.add_argument("--sample_size", type=int, default=-1, help="sample size, -1
 # Optimizer Parameters
 parser.add_argument("--optimizer", type=str, choices=list(ALL_OPTIMIZERS.keys()), default='Adam')
 parser.add_argument("--lr", type=float, default=1e-3)
-parser.add_argument("--weight_decay", type=float, default=0.005)
+parser.add_argument("--weight_decay", type=float, default=0.0005)
 parser.add_argument("--momentum", type=float, default=0.95)
 # Dataset Parameters
 parser.add_argument("--data_dir", type=str, default="./data")

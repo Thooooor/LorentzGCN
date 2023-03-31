@@ -1,6 +1,6 @@
 import torch
 from manifolds import Hyperboloid, ManifoldParameter
-from layers import LorentzLayer
+from layers import HyperbolicLayer
 import numpy as np
 
 
@@ -38,7 +38,7 @@ class HGCF(torch.nn.Module):
         self.embedding.weight = ManifoldParameter(self.embedding.weight, True, self.manifold, self.c)
 
         hgc_layers = []
-        hgc_layers.append(LorentzLayer(self.manifold, embedding_dim, self.c, network, num_layers))
+        hgc_layers.append(HyperbolicLayer(self.manifold, embedding_dim, self.c, network, num_layers))
         self.convs = torch.nn.Sequential(*hgc_layers)
         
         self.encode_graph = True

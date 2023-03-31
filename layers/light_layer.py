@@ -7,5 +7,5 @@ class LightLayer(nn.Module):
         super(LightLayer, self).__init__()
         self.normalize = normalize
         
-    def forward(self, x: Tensor, edge_index) -> Tensor:
-        return spmm(edge_index, x)
+    def forward(self, x: Tensor, adj) -> Tensor:
+        return spmm(adj, x)

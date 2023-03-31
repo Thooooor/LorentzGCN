@@ -19,7 +19,7 @@ class Base(torch.nn.Module):
         self.embedding_dim = args.embedding_dim
         self.num_layers = args.num_layers
         self.margin = args.margin
-        self.embedding = torch.nn.Embedding(self.num_nodes, self.embedding_dim).cuda()
+        self.embedding = torch.nn.Embedding(num_embeddings=self.num_nodes, embedding_dim=self.embedding_dim).cuda()
         
         self.reset_parameters(args.scale)
         
