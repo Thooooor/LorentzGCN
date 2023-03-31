@@ -35,25 +35,9 @@ class LightGCN(Base):
         self.register_buffer('alpha', alpha)
 
         self.convs = torch.nn.ModuleList([LightLayer() for _ in range(self.num_layers)])
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        torch.nn.init.normal_(self.embedding.weight, std=0.1)
-
-    def forward(self, edge_index: Adj):
-        """
-
-        :param edge_index: [2, num_edges]
-        :return: [num_edges, 1]
-        """
-        out = self.compute_embedding()
-
-        out_src = out[edge_index[0]]
-        out_dst = out[edge_index[1]]
-
-        return (out_src * out_dst).sum(dim=-1)
+    
+    def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
+        return (src_embbeding * dst_embedding).sum(dim=-1)
 
     def compute_embedding(self):
         """

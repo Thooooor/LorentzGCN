@@ -45,7 +45,7 @@ def main():
     logging.info("Building models")
     start = time()
 
-    # model = LightGCN(dataset.num_users, dataset.num_items, dataset.train_edge_index, args.dim, args.layer)
+    # model = LightGCN(dataset.num_users, dataset.num_items, dataset.adj_train_norm, args.dim, args.layer)
     model = HGCF(dataset.num_users, dataset.num_items, dataset.adj_train_norm)
     
     logging.info("Building models costs {: .2f}s".format(time() - start))
@@ -55,7 +55,6 @@ def main():
     # optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
     optimizer = RiemannianSGD(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
 
-    
     # train process
     best_epoch = 0
     best_metrics = None

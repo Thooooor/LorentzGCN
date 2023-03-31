@@ -17,20 +17,28 @@ class Base(torch.nn.Module):
             graph,
             embedding_dim=64,
             num_layers=3,
-            num_negatives=1
+            scale=0.1,
+            margin=1.0
     ):
         super(Base, self).__init__()
-
-        self.num_negatives = num_negatives
         self.graph = graph.cuda()
         self.num_users = num_users
         self.num_items = num_items
         self.num_nodes = num_users + num_items
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
-        self.embedding = torch.nn.Embedding(self.num_nodes, embedding_dim)
-        self.adj_mat = torch.ones((self.num_nodes, self.num_nodes))
-        self.adj_mat[self.num_users:, self.num_users:] = 0
+        self.margin = margin
+        self.embedding = torch.nn.Embedding(self.num_nodes, embedding_dim).cuda()
+        
+        self.reset_parameters(scale)
+        
+    def reset_parameters(self, scale):
+        """Reinitialize learnable parameters.
+
+        Args:
+            scale: scale of uniform distribution.
+        """
+        torch.nn.init.uniform_(self.embedding.weight, a=-scale, b=scale)
 
     @abstractmethod
     def forward(self, edge_index: Adj):
@@ -39,7 +47,12 @@ class Base(torch.nn.Module):
         :param edge_index: [2, num_edges]
         :return: [num_edges, 1]
         """
-        pass
+        out = self.compute_embedding()
+        
+        out_src = out[edge_index[0]]
+        out_dst = out[edge_index[1]]
+        
+        return self.score_function(out_src, out_dst)
 
     @abstractmethod
     def compute_embedding(self):
@@ -49,21 +62,13 @@ class Base(torch.nn.Module):
         """
         pass
 
-    def score_function(self, user_ids: Tensor, item_ids: Tensor):
+    def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
         """
         Score function for given users and items.
-        :param user_ids: [num_users]
-        :param item_ids: [num_items]
+        :param src_embbeding: [num_users, embedding_dim]
+        :param dst_embedding: [num_items, embedding_dim]
         :return: [num_users, num_items]
         """
-        user_embeddings = self.embedding(user_ids)
-        item_embeddings = self.embedding(item_ids)
-
-        scores = user_embeddings @ item_embeddings.t()
-
-        return scores
-
-    def pair_wise_score_function(self, user_ids: Tensor, item_ids: Tensor):
         pass
 
     def bpr_loss(self, edge_index: Adj, neg_edge_index: Adj, lambda_reg: float = 1e-4):
@@ -80,14 +85,12 @@ class Base(torch.nn.Module):
         log_prob = F.logsigmoid(-(pos_scores - neg_scores)).mean()
         return -log_prob + lambda_reg * self.regularization_loss
 
-
     def margin_loss(self, edge_index: Adj, neg_edge_index: Adj, margin: float = 0.1):
         """
         Margin-based loss.
         :param edge_index: [2, num_edges]
         :param neg_edge_index: [2, num_edges]
         :param margin: float
-        
         :return: float
         """
         pos_scores = self.forward(edge_index)
@@ -126,11 +129,11 @@ class Base(torch.nn.Module):
         
         for user in range(self.num_users):
             user_embedding = out[user]
-            user_embedding = user_embedding.repeat(self.num_items).view(self.num_items, -1)
+            user_embeddings = user_embedding.repeat(self.num_items).view(self.num_items, -1)
             item_embeddings = out[np.arange(self.num_users, self.num_nodes), :]
-            sqdist = self.manifold.sqdist(user_embedding, item_embeddings, self.c)
+            scores = self.score_function(user_embeddings, item_embeddings)
 
-            probs = sqdist.detach().cpu().numpy() * -1
+            probs = scores.detach().cpu().numpy() * -1
             probs_matrix[user] = np.reshape(probs, [-1, ])
             
         return probs_matrix
