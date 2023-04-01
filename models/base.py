@@ -32,10 +32,11 @@ class Base(torch.nn.Module):
         torch.nn.init.uniform_(self.embedding.weight, a=-scale, b=scale)
 
     @abstractmethod
-    def forward(self, edge_index: Adj):
+    def forward(self, edge_index: Adj, include_embedding: bool = False):
         """
-        Forward propagation.
+        Forward propagation. 
         :param edge_index: [2, num_edges]
+        :param include_embedding: bool (default: False) 
         :return: [num_edges, 1]
         """
         out = self.compute_embedding()
@@ -43,7 +44,12 @@ class Base(torch.nn.Module):
         out_src = out[edge_index[0]]
         out_dst = out[edge_index[1]]
         
-        return self.score_function(out_src, out_dst)
+        scores = self.score_function(out_src, out_dst)
+        
+        if include_embedding:
+            return scores, out_src, out_dst
+        else:
+            return scores
 
     @abstractmethod
     def compute_embedding(self):
@@ -72,9 +78,14 @@ class Base(torch.nn.Module):
         """
         pos_scores = self.forward(edge_index)
         neg_scores = self.forward(neg_edge_index)
-
-        log_prob = F.logsigmoid(-(pos_scores - neg_scores)).mean()
-        return -log_prob + lambda_reg * self.regularization_loss
+        log_prob = F.softplus(-(pos_scores - neg_scores)).mean()
+        
+        user_embedding = self.embedding(edge_index[0])
+        pos_item_embedding = self.embedding(edge_index[1])
+        neg_item_embedding = self.embedding(neg_edge_index[1])
+        regularization_loss = (1/2) * (user_embedding.norm(p=2).pow(2) + pos_item_embedding.norm(p=2).pow(2) + neg_item_embedding.norm(p=2).pow(2)) / float(edge_index.shape[1])
+        
+        return log_prob + lambda_reg * regularization_loss
 
     def margin_loss(self, edge_index: Adj, neg_edge_index: Adj, margin: float = 0.1):
         """
@@ -93,21 +104,7 @@ class Base(torch.nn.Module):
 
     @property
     def regularization_loss(self):
-        return self.embedding.weight.norm(p=2).pow(2)
-
-    def recommend(self, user_ids: Tensor, top_k=10):
-        """
-        Recommend top-k items for given users.
-        :param user_ids: [num_users]
-        :param top_k: int
-        :return: [num_users, top_k]
-        """
-        scores = self.get_user_rating(user_ids)
-        _, indices = scores.topk(top_k, dim=-1)
-
-        dst_index = indices + self.num_users
-
-        return dst_index
+        return (1/2) * self.embedding.weight.norm(p=2).pow(2) / self.num_nodes
 
     def get_user_rating(self):
         """
