@@ -22,6 +22,9 @@ class LightGCN(Base):
 
         self.convs = torch.nn.ModuleList([LightLayer() for _ in range(self.num_layers)])
     
+    def loss(self, edge_index, neg_edge_index, lambda_reg = 1e-4):
+        return self.bpr_loss(edge_index, neg_edge_index, lambda_reg)
+    
     def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
         return (src_embbeding * dst_embedding).sum(dim=-1)
 

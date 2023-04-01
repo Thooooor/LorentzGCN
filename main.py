@@ -45,7 +45,6 @@ def main():
     logging.info("Building models")
     start = time()
 
-    # model = LightGCN(dataset.num_users, dataset.num_items, dataset.adj_train_norm, args.dim, args.layer)
     model = ALL_MODELS[args.model](dataset.num_users, dataset.num_items, dataset.adj_train_norm, args)
     
     logging.info("Building models costs {: .2f}s".format(time() - start))
@@ -116,9 +115,9 @@ def main():
 def train(train_loader, model, optimizer):
     """
 
-    :param train_loader:
-    :param model:
-    :param optimizer:
+    :param train_loader: DataLoader
+    :param model: 
+    :param optimizer: 
     :return:
     """
     train_loss = AverageRecord()
@@ -129,7 +128,7 @@ def train(train_loader, model, optimizer):
             # compute loss
             edge_index = torch.stack([users, pos_items], dim=0)
             neg_edge_index = torch.stack([users, neg_items], dim=0)
-            loss = model.margin_loss(edge_index, neg_edge_index)
+            loss = model.loss(edge_index, neg_edge_index)
             # compute gradient
             optimizer.zero_grad()
             loss.backward()
@@ -145,16 +144,21 @@ def train(train_loader, model, optimizer):
 def evaluate(eval_dict, user_item_csr, model, k_list, split="valid"):
     """
 
-    :param data_loader:
-    :param model:
-    :param k_list:
-    :param split:
+    :param eval_dict: dict of user-item pairs
+    :param user_item_csr: csr_matrix of user-item interactions
+    :param model: model to evaluate
+    :param k_list: list of k
+    :param split: valid or test
     :return:
     """
     eval_metric = Metrics(k_list, split)
+    
     model.eval()
-    rating_metrix = model.get_user_rating()
+    with torch.no_grad():
+        rating_metrix = model.get_user_rating()
+        
     eval_metric.compute_metrics(rating_metrix, eval_dict, user_item_csr)
+    
     return eval_metric
 
 

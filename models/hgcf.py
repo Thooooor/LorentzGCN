@@ -21,6 +21,9 @@ class HGCF(Base):
         self.convs = torch.nn.Sequential(*hgc_layers)
         
         self.encode_graph = True
+        
+    def loss(self, edge_index, neg_edge_index, margin=1.0):
+        return self.margin_loss(edge_index, neg_edge_index, margin)
     
     def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
         return self.manifold.sqdist(src_embbeding, dst_embedding, c=self.c)

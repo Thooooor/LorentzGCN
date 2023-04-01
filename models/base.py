@@ -102,10 +102,6 @@ class Base(torch.nn.Module):
         loss[loss < 0] = 0
         return loss.sum()
 
-    @property
-    def regularization_loss(self):
-        return (1/2) * self.embedding.weight.norm(p=2).pow(2) / self.num_nodes
-
     def get_user_rating(self):
         """
         Get rating scores of all items for given users.

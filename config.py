@@ -33,7 +33,7 @@ parser.add_argument("--sample_size", type=int, default=-1, help="sample size, -1
 # Optimizer Parameters
 parser.add_argument("--optimizer", type=str, choices=list(ALL_OPTIMIZERS.keys()), default='Adam')
 parser.add_argument("--lr", type=float, default=1e-3)
-parser.add_argument("--weight_decay", type=float, default=0.0005)
+parser.add_argument("--weight_decay", type=float, default=0.0001)
 parser.add_argument("--momentum", type=float, default=0.95)
 # Dataset Parameters
 parser.add_argument("--data_dir", type=str, default="./data")
