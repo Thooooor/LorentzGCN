@@ -66,7 +66,7 @@ def main():
         if (epoch + 1) % args.eval_freq == 0:
             valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
             logging.info("Epoch {} | valid metrics: {}".format(epoch, valid_metrics))
-            if not best_metrics or valid_metrics["valid NDCG@50"] > best_metrics["valid NDCG@50"]:
+            if not best_metrics or valid_metrics["valid Recall@50"] > best_metrics["valid Recall@50"]:
                 best_epoch = epoch
                 best_metrics = valid_metrics
                 torch.save(model.cpu().state_dict(), os.path.join(saving_path, "best_model.pth"))

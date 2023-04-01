@@ -80,9 +80,9 @@ class Base(torch.nn.Module):
         neg_scores = self.forward(neg_edge_index)
         log_prob = F.softplus(-(pos_scores - neg_scores)).mean()
         
-        user_embedding = self.embedding(edge_index[0])
-        pos_item_embedding = self.embedding(edge_index[1])
-        neg_item_embedding = self.embedding(neg_edge_index[1])
+        user_embedding = self.embedding.weight[edge_index[0]]
+        pos_item_embedding = self.embedding.weight[edge_index[1]]
+        neg_item_embedding = self.embedding.weight[neg_edge_index[1]]
         regularization_loss = (1/2) * (user_embedding.norm(p=2).pow(2) + pos_item_embedding.norm(p=2).pow(2) + neg_item_embedding.norm(p=2).pow(2)) / float(edge_index.shape[1])
         
         return log_prob + lambda_reg * regularization_loss

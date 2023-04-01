@@ -1,4 +1,5 @@
 /test.py
+/test.ipynb
 /__pycache__/
 /logs/
 /layers/__pycache__/
@@ -6,4 +7,3 @@
 /utils/__pycache__/
 /manifolds/__pycache__/
 /optimizers/__pycache__/
-.idea/

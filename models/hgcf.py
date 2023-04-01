@@ -2,7 +2,6 @@ import torch
 from torch import Tensor
 from manifolds import Hyperboloid, ManifoldParameter
 from layers import HyperbolicLayer
-import numpy as np
 from .base import Base
 
 
@@ -22,8 +21,8 @@ class HGCF(Base):
         
         self.encode_graph = True
         
-    def loss(self, edge_index, neg_edge_index, margin=1.0):
-        return self.margin_loss(edge_index, neg_edge_index, margin)
+    def loss(self, edge_index, neg_edge_index):
+        return self.margin_loss(edge_index, neg_edge_index, self.margin)
     
     def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
         return self.manifold.sqdist(src_embbeding, dst_embedding, c=self.c)

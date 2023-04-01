@@ -12,21 +12,18 @@ class LightGCN(Base):
     def __init__(self, num_users, num_items, graph, args):
         super(LightGCN, self).__init__(num_users, num_items, graph, args)
 
-        if alpha is None:
-            alpha = 1. / (self.num_layers + 1)
-        if isinstance(alpha, Tensor):
-            assert alpha.size(0) == self.num_layers + 1
-        else:
-            alpha = torch.tensor([alpha] * (self.num_layers + 1))
-        self.register_buffer('alpha', alpha)
+        alpha = 1. / (self.num_layers + 1)
+        self.alpha = torch.tensor([alpha] * (self.num_layers + 1))
 
         self.convs = torch.nn.ModuleList([LightLayer() for _ in range(self.num_layers)])
     
     def loss(self, edge_index, neg_edge_index, lambda_reg = 1e-4):
-        return self.bpr_loss(edge_index, neg_edge_index, lambda_reg)
+        # return self.bpr_loss(edge_index, neg_edge_index, lambda_reg)
+        return self.margin_loss(edge_index, neg_edge_index, self.margin)
     
     def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
-        return (src_embbeding * dst_embedding).sum(dim=-1)
+        # return (src_embbeding * dst_embedding).sum(dim=-1)
+        return torch.sum((src_embbeding - dst_embedding).pow(2), dim=-1)
 
     def compute_embedding(self):
         """
