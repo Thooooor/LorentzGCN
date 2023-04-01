@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from config import parser
 from models import ALL_MODELS
-from optimizers.rsgd import RiemannianSGD
+from optimizers import ALL_OPTIMIZERS
 from utils import set_up_logger, Taobao, AverageRecord, Metrics, set_seed, set_device
 
 warnings.filterwarnings("ignore")
@@ -50,10 +50,8 @@ def main():
     logging.info("Building models costs {: .2f}s".format(time() - start))
 
     # define optimizer
-    # optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    # optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
-    optimizer = RiemannianSGD(params=model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
-
+    optimizer = ALL_OPTIMIZERS[args.optimizer](model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
+    
     # train process
     best_epoch = 0
     best_metrics = None
