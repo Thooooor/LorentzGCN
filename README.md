@@ -1,13 +1,6 @@
 # LorentzGCN
 
-## TODO:
-
-- [x] Fix Evaluation Metrics and valid/test dataset
-- [ ] Fix BPR Loss function
-- [ ] Add NDCG model
-- [ ] LorentzGCN
-
-## Run
+## Env
 ```shell
 conda create -n lorentz python=3.10
 conda activate lorentz
@@ -21,4 +14,14 @@ torch==1.13.0
 torch_geometric==2.2.0
 tqdm==4.64.1
 wandb==0.14.0
+```
+
+## Run
+```shell
+chmod +x ./scripts/lorentz_gcn.sh
+./scripts/lorentz_gcn.sh
+```
+or
+```shell
+python main.py
 ```
