@@ -69,8 +69,8 @@ class Metrics:
         """Format metrics to string"""
         result = ""
         for i, k in enumerate(self.k_list):
-            result += "Recall@{}: {:.2} | ".format(k, self.recall[i])
-            result += "NDCG@{}: {:.2} | ".format(k, self.ndcg[i])
+            result += "Recall@{}: {:.4} | ".format(k, self.recall[i])
+            result += "NDCG@{}: {:.4} | ".format(k, self.ndcg[i])
         result += "Time: {:.2f}s".format(time() - self.start_time)
         return result
 
