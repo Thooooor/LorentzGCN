@@ -69,6 +69,7 @@ class BaseSampler:
         """
         users, pos_items, neg_items = self.structured_negative_sampling()
         
+        # reshape negative items
         if self.num_negatives > 1:
             neg_items = neg_items.view(-1, self.num_negatives)
         
