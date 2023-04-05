@@ -87,7 +87,7 @@ class Base(torch.nn.Module):
         
         return log_prob + lambda_reg * regularization_loss
 
-    def margin_loss(self, edge_index: Adj, neg_edge_index: Adj, margin: float = 0.1):
+    def margin_loss(self, users, pos_items, neg_items_list, margin: float = 0.1):
         """
         Margin-based loss.
         :param edge_index: [2, num_edges]
@@ -95,8 +95,16 @@ class Base(torch.nn.Module):
         :param margin: float
         :return: float
         """
+        edge_index = torch.stack([users, pos_items], dim=0)
         pos_scores = self.forward(edge_index)
-        neg_scores = self.forward(neg_edge_index)
+        
+        num_negatives = neg_items_list.shape[1]
+        neg_scores_list = []
+        for i in range(num_negatives):
+            neg_edge_index = torch.stack([users, neg_items_list[:, i]], dim=0)
+            neg_scores_list.append(self.forward(neg_edge_index))
+        neg_scores = torch.stack(neg_scores_list, dim=1)
+        neg_scores = torch.mean(neg_scores, dim=1)
         
         loss = pos_scores - neg_scores + margin
         loss[loss < 0] = 0

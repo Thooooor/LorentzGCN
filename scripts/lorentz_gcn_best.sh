@@ -10,10 +10,10 @@ python main.py \
     --cuda True \
     --device 4 \
     --epochs 500 \
-    --patience 5 \
+    --patience 10 \
     --eval_freq 5 \
     --batch_size 1024 \
     --optimizer rsgd \
     --lr 0.001 \
-    --weight_decay 0.002 \
+    --weight_decay 0.003 \
     --momentum 0.9 \

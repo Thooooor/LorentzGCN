@@ -16,8 +16,8 @@ class LorentzGCN(Base):
         
         self.layers = torch.nn.ModuleList([LorentzLayer(self.manifold, self.c) for _ in range(self.num_layers)])
 
-    def loss(self, edge_index, neg_edge_index):
-        return self.margin_loss(edge_index, neg_edge_index, self.margin)
+    def loss(self, users, pos_items, neg_items_list):
+        return self.margin_loss(users, pos_items, neg_items_list, self.margin)
     
     def score_function(self, src_embbeding: Tensor, dst_embedding: Tensor):
         return self.manifold.sqdist(src_embbeding, dst_embedding, c=self.c)

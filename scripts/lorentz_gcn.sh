@@ -1,7 +1,7 @@
 #!/bin/bash
 python main.py \
     --model lorentz_gcn \
-    --layers 4 \
+    --layers 3 \
     --dim 64 \
     --scale 0.1 \
     --margin 1.0 \
@@ -10,10 +10,11 @@ python main.py \
     --cuda True \
     --device 4 \
     --epochs 500 \
-    --patience 10 \
+    --patience 5 \
     --eval_freq 5 \
-    --batch_size 2048 \
+    --num_negatives 3 \
+    --batch_size 1024 \
     --optimizer rsgd \
     --lr 0.001 \
-    --weight_decay 0.002 \
+    --weight_decay 0.003 \
     --momentum 0.9 \

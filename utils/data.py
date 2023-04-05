@@ -1,86 +1,16 @@
 import pickle
-from abc import ABC
-
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
 from torch_geometric.data import Data
 import scipy.sparse as sp
 from scipy.sparse import csr_matrix
 
 
-class EdgeDataset(Dataset, ABC):
-    """
-    EdgeDataset for training data
-    """
-
-    def __init__(
-            self,
-            edge_index: torch.Tensor,
-            data_size: int,
-            split: str = "train",
-            num_negatives: int = 1,
-    ):
-        super().__init__()
-        self.num_negatives = num_negatives
-        self.data_size = data_size
-        self.split = split
-        self.edge_index = edge_index
-
-    def __len__(self):
-        return self.data_size
-
-    def __getitem__(self, idx):
-        return self.edge_index[0][idx], self.edge_index[1][idx], self.edge_index[2][idx]
-
-
-class UserDataset(Dataset, ABC):
-    """
-    UserDataset for validation and test data
-    """
-
-    def __init__(
-            self,
-            edge_index: torch.Tensor,
-            users: torch.Tensor,
-            data: dict,
-            split: str = "valid",
-    ):
-        super().__init__()
-        self.edge_index = edge_index
-        self.users = users
-        self.data_size = users.shape[0]
-        self.split = split
-        self.data = data
-
-    def __len__(self):
-        return self.data_size
-
-    def __getitem__(self, idx):
-        return torch.tensor(self.users[idx], dtype=torch.long)
-
-    def get_items(self, users, num_users):
-        """
-        Get items for users
-        :param num_users: 
-        :param users:
-        :return:
-        """
-        items = []
-
-        for user in users:
-            items.append([item_id + num_users for item_id in self.data[int(user)]])
-
-        return items
-
-
-class Taobao(Dataset, ABC):
+class Taobao:
     """Taobao dataset"""
 
-    def __init__(self, path, batch_size=128, num_negatives=1):
+    def __init__(self, path):
         super().__init__()
-        self.num_negatives = num_negatives
-        self.batch_size = batch_size
         self.path = path
         self.num_users = 0
         self.num_items = 0
@@ -245,30 +175,12 @@ class Taobao(Dataset, ABC):
         return test_dict
 
     @property
-    def train_set(self):
-        users, pos_items, neg_items = self.structured_negative_sampling()
-        sampled_edge_index = torch.stack([users, pos_items, neg_items], dim=0)
-        return EdgeDataset(sampled_edge_index, self.train_size, split="train")
-
-    @property
     def valid_set(self):
-        return UserDataset(self.valid_edge_index, self.valid_unique_users, self.valid_dict, split="valid")
-
+        return self.valid_dict
+    
     @property
     def test_set(self):
-        return UserDataset(self.test_edge_index, self.test_unique_users, self.test_dict, split="test")
-
-    @property
-    def train_loader(self):
-        return DataLoader(self.train_set, batch_size=self.batch_size, shuffle=True)
-
-    @property
-    def valid_loader(self):
-        return DataLoader(self.valid_set, batch_size=self.batch_size, shuffle=False)
-
-    @property
-    def test_loader(self):
-        return DataLoader(self.test_set, batch_size=self.batch_size, shuffle=False)
+        return self.test_dict
 
 
 def normalize(mx):

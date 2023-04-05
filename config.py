@@ -29,7 +29,7 @@ parser.add_argument("--epochs", type=int, default=500)
 parser.add_argument("--patience", type=int, default=5)
 parser.add_argument("--eval_freq", type=int, default=5)
 parser.add_argument("--batch_size", type=int, default=1024, help='mini-batch size')
-parser.add_argument("--sample_size", type=int, default=-1, help="sample size, -1 to not use sampling")
+parser.add_argument("--num_negatives", type=int, default=1)
 # Optimizer Parameters
 parser.add_argument("--optimizer", type=str, choices=list(ALL_OPTIMIZERS.keys()), default='Adam')
 parser.add_argument("--lr", type=float, default=1e-3)

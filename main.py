@@ -11,6 +11,8 @@ from config import parser
 from models import ALL_MODELS
 from optimizers import ALL_OPTIMIZERS
 from utils import set_up_logger, Taobao, AverageRecord, Metrics, set_seed, set_device
+from samplers import BaseSampler
+
 
 warnings.filterwarnings("ignore")
 
@@ -36,17 +38,16 @@ def main():
     # load data
     logging.info("Loading {} dataset".format(args.dataset))
     start = time()
-
-    dataset = Taobao(args.data_dir, args.batch_size)
-
+    dataset = Taobao(args.data_dir)
+    sampler = BaseSampler(dataset.num_users, dataset.num_items, args.num_negatives, dataset.train_edge_index, args.batch_size)
+    valid_set = dataset.valid_set
+    test_set = dataset.test_set
     logging.info("Loading data costs {: .2f}s".format(time() - start))
 
     # build models
     logging.info("Building models")
     start = time()
-
     model = ALL_MODELS[args.model](dataset.num_users, dataset.num_items, dataset.adj_train_norm, args)
-    
     logging.info("Building models costs {: .2f}s".format(time() - start))
 
     # define optimizer
@@ -59,12 +60,12 @@ def main():
 
     logging.info("Start training")
     for epoch in range(args.epochs):
-        train_loss = train(dataset.train_loader, model, optimizer)
+        train_loss = train(sampler, model, optimizer)
         logging.info("Epoch {} | average train loss: {:.4f}".format(epoch, train_loss))
         # valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
 
         if (epoch + 1) % args.eval_freq == 0:
-            valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
+            valid_metrics = evaluate(valid_set, dataset.user_item_csr, model, args.k_list, split="valid")
             logging.info("Epoch {} | valid metrics: {}".format(epoch, valid_metrics))
             if not best_metrics or valid_metrics["valid Recall@50"] > best_metrics["valid Recall@50"]:
                 best_epoch = epoch
@@ -99,9 +100,9 @@ def main():
     model.cuda()
     model.eval()
 
-    valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
+    valid_metrics = evaluate(valid_set, dataset.user_item_csr, model, args.k_list, split="valid")
     logging.info("Valid metrics: {}".format(valid_metrics))
-    test_metrics = evaluate(dataset.test_dict, dataset.user_item_csr, model, args.k_list, split="test")
+    test_metrics = evaluate(test_set, dataset.user_item_csr, model, args.k_list, split="test")
     logging.info("Test metrics: {}".format(test_metrics))
 
     if args.wandb is True:
@@ -110,7 +111,7 @@ def main():
         wandb.run.summary.update(test_metrics)
 
 
-def train(train_loader, model, optimizer):
+def train(sampler, model, optimizer):
     """
 
     :param train_loader: DataLoader
@@ -119,14 +120,13 @@ def train(train_loader, model, optimizer):
     :return:
     """
     train_loss = AverageRecord()
+    train_loader = sampler.get_data_loader()
     model.cuda()
     model.train()
     with tqdm(total=len(train_loader)) as bar:
-        for users, pos_items, neg_items in train_loader:
+        for users, pos_items, neg_items_list in train_loader:
             # compute loss
-            edge_index = torch.stack([users, pos_items], dim=0)
-            neg_edge_index = torch.stack([users, neg_items], dim=0)
-            loss = model.loss(edge_index, neg_edge_index)
+            loss = model.loss(users, pos_items, neg_items_list)
             # compute gradient
             optimizer.zero_grad()
             loss.backward()
