@@ -28,6 +28,7 @@ class EdgeDataset(Dataset, ABC):
     def __getitem__(self, idx):
         return self.edge_index[0, idx], self.edge_index[1, idx], self.neg_edge_index[idx]
 
+
 class BaseSampler:
     def __init__(self, num_users, num_items, num_negatives, train_edge_index, batch_size=512):
         self.num_users = num_users
