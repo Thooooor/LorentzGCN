@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch_geometric.typing import Adj
-
+import logging
 
 class Base(torch.nn.Module):
     """Base class for GNN Recommender System."""
@@ -20,7 +20,7 @@ class Base(torch.nn.Module):
         self.num_layers = args.num_layers
         self.margin = args.margin
         self.embedding = torch.nn.Embedding(num_embeddings=self.num_nodes, embedding_dim=self.embedding_dim).cuda()
-        
+        self.probs_matrix = torch.zeros((self.num_users, self.num_items), requires_grad=False)
         self.reset_parameters(args.scale)
         
     def reset_parameters(self, scale):
@@ -86,8 +86,62 @@ class Base(torch.nn.Module):
         regularization_loss = (1/2) * (user_embedding.norm(p=2).pow(2) + pos_item_embedding.norm(p=2).pow(2) + neg_item_embedding.norm(p=2).pow(2)) / float(edge_index.shape[1])
         
         return log_prob + lambda_reg * regularization_loss
+    
+    def structured_negative_sampling(self, users, pos_items, num_negatives: int = 1):
+        """
+        Structured negative sampling
+        :return:
+        """
+        i, j = users.cpu(), pos_items.cpu()
+        idx_1 = i * self.num_items + j
+        i = i.repeat(num_negatives)
+        neg_items_list = torch.randint(self.num_users, self.num_nodes, (i.size(0),), dtype=torch.long)  # (e*t)
+        idx_2 = i * self.num_nodes + neg_items_list
 
-    def margin_loss(self, users, pos_items, neg_items_list, margin: float = 0.1):
+        mask = torch.from_numpy(np.isin(idx_2, idx_1)).to(torch.bool)  # (e*t,)
+        rest = mask.nonzero(as_tuple=False).view(-1)
+        while rest.numel() > 0:  # pragma: no cover
+            # sample from the item set
+            tmp = torch.randint(self.num_users, self.num_nodes, (rest.numel(),), dtype=torch.long)
+            idx_2 = i[rest] * self.num_nodes + tmp
+            mask = torch.from_numpy(np.isin(idx_2, idx_1)).to(torch.bool)
+            neg_items_list[rest] = tmp
+            rest = rest[mask.nonzero(as_tuple=False).view(-1)]
+
+        assert neg_items_list.min() > self.num_users - 1 and neg_items_list.max() < self.num_nodes
+
+        return neg_items_list.view(-1, num_negatives)
+    
+    def weighted_negative_sampling(self, users, pos_items, num_negatives: int = 1):
+        i, j = users, pos_items
+        
+        all_ratings = self.probs_matrix[i]
+        item_ratings = self.probs_matrix[i, j-self.num_users]
+        item_ratings = item_ratings.reshape(-1, 1)
+        weight_matrix = -torch.abs(all_ratings - item_ratings)
+        weight_matrix = torch.softmax(weight_matrix, dim=1)
+
+        idx_1 = i * self.num_items + j
+        i = i.repeat(num_negatives)
+        neg_items_list = torch.multinomial(weight_matrix, num_negatives, replacement=False)  # (e*t)
+        neg_items_list = neg_items_list.transpose(0, 1).flatten() + self.num_users
+        idx_2 = i * self.num_nodes + neg_items_list
+
+        mask = torch.from_numpy(np.isin(idx_2, idx_1)).to(torch.bool)  # (e*t,)
+        rest = mask.nonzero(as_tuple=False).view(-1)
+        while rest.numel() > 0:  # pragma: no cover
+            # sample from the item set
+            tmp = torch.randint(self.num_users, self.num_nodes, (rest.numel(),), dtype=torch.long)
+            idx_2 = i[rest] * self.num_nodes + tmp
+            mask = torch.from_numpy(np.isin(idx_2, idx_1)).to(torch.bool)
+            neg_items_list[rest] = tmp
+            rest = rest[mask.nonzero(as_tuple=False).view(-1)]
+
+        assert neg_items_list.min() > self.num_users - 1 and neg_items_list.max() < self.num_nodes
+
+        return neg_items_list.view(-1, num_negatives)
+
+    def margin_loss(self, users, pos_items, num_negatives, margin: float = 0.1):
         """
         Margin-based loss.
         :param edge_index: [2, num_edges]
@@ -101,7 +155,8 @@ class Base(torch.nn.Module):
         pos_item_embedding = out[pos_items]
         pos_scores = self.score_function(user_embedding, pos_item_embedding)
         
-        num_negatives = neg_items_list.shape[1]
+        # neg_items_list = self.structured_negative_sampling(users, pos_items, num_negatives)
+        neg_items_list = self.weighted_negative_sampling(users, pos_items, num_negatives)
         neg_scores_list = []
         for i in range(num_negatives):
             neg_item_embedding = out[neg_items_list[:, i]]
@@ -130,5 +185,7 @@ class Base(torch.nn.Module):
 
             probs = scores.detach().cpu().numpy() * -1
             probs_matrix[user] = np.reshape(probs, [-1, ])
-            
+        
+        self.probs_matrix = probs_matrix
+        
         return probs_matrix

@@ -4,6 +4,7 @@ import warnings
 from time import time
 
 import torch
+from torch.utils.data import DataLoader
 import wandb
 from tqdm import tqdm
 
@@ -42,6 +43,7 @@ def main():
     sampler = BaseSampler(dataset.num_users, dataset.num_items, args.num_negatives, dataset.train_edge_index, args.batch_size)
     valid_set = dataset.valid_set
     test_set = dataset.test_set
+    train_loader = DataLoader(dataset.train_set, batch_size=args.batch_size, shuffle=True)
     logging.info("Loading data costs {: .2f}s".format(time() - start))
 
     # build models
@@ -60,7 +62,7 @@ def main():
 
     logging.info("Start training")
     for epoch in range(args.epochs):
-        train_loss = train(sampler, model, optimizer)
+        train_loss = train(train_loader, model, optimizer, args.num_negatives)
         logging.info("Epoch {} | average train loss: {:.4f}".format(epoch, train_loss))
         # valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
 
@@ -111,7 +113,7 @@ def main():
         wandb.run.summary.update(test_metrics)
 
 
-def train(sampler, model, optimizer):
+def train(train_loader, model, optimizer, num_negatives=1):
     """
 
     :param train_loader: DataLoader
@@ -120,13 +122,13 @@ def train(sampler, model, optimizer):
     :return:
     """
     train_loss = AverageRecord()
-    train_loader = sampler.get_data_loader()
+    # train_loader = sampler.get_data_loader()
     model.cuda()
     model.train()
     with tqdm(total=len(train_loader)) as bar:
-        for users, pos_items, neg_items_list in train_loader:
+        for users, pos_items in train_loader:
             # compute loss
-            loss = model.loss(users, pos_items, neg_items_list)
+            loss = model.loss(users, pos_items, num_negatives)
             # compute gradient
             optimizer.zero_grad()
             loss.backward()

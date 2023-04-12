@@ -4,6 +4,29 @@ import torch
 from torch_geometric.data import Data
 import scipy.sparse as sp
 from scipy.sparse import csr_matrix
+from torch.utils.data import Dataset
+from abc import ABC
+
+
+class EdgeDataset(Dataset, ABC):
+    """
+    EdgeDataset for training data
+    """
+
+    def __init__(
+            self,
+            edge_index: torch.Tensor,
+            split: str = "train",
+    ):
+        super().__init__()
+        self.split = split
+        self.edge_index = edge_index
+
+    def __len__(self):
+        return self.edge_index.size(1)
+
+    def __getitem__(self, idx):
+        return self.edge_index[0, idx], self.edge_index[1, idx]
 
 
 class Taobao:
@@ -181,6 +204,10 @@ class Taobao:
     @property
     def test_set(self):
         return self.test_dict
+    
+    @property
+    def train_set(self):
+        return EdgeDataset(self.train_edge_index)
 
 
 def normalize(mx):

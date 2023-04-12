@@ -8,7 +8,7 @@ python main.py \
     --k_list [50] \
     --random_seed 2020 \
     --cuda True \
-    --device 4 \
+    --device 1 \
     --epochs 500 \
     --patience 5 \
     --eval_freq 5 \
