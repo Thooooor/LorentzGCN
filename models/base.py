@@ -95,14 +95,17 @@ class Base(torch.nn.Module):
         :param margin: float
         :return: float
         """
-        edge_index = torch.stack([users, pos_items], dim=0)
-        pos_scores = self.forward(edge_index)
+        out = self.compute_embedding()
+        
+        user_embedding = out[users]
+        pos_item_embedding = out[pos_items]
+        pos_scores = self.score_function(user_embedding, pos_item_embedding)
         
         num_negatives = neg_items_list.shape[1]
         neg_scores_list = []
         for i in range(num_negatives):
-            neg_edge_index = torch.stack([users, neg_items_list[:, i]], dim=0)
-            neg_scores_list.append(self.forward(neg_edge_index))
+            neg_item_embedding = out[neg_items_list[:, i]]
+            neg_scores_list.append(self.score_function(user_embedding, neg_item_embedding))
         neg_scores = torch.stack(neg_scores_list, dim=1)
         neg_scores = torch.mean(neg_scores, dim=1)
         
