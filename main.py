@@ -12,8 +12,7 @@ from config import parser
 from models import ALL_MODELS
 from optimizers import ALL_OPTIMIZERS
 from utils import set_up_logger, Taobao, AverageRecord, Metrics, set_seed, set_device
-from samplers import BaseSampler
-
+from samplers import BaseSampler, WeightedSampler
 
 warnings.filterwarnings("ignore")
 
@@ -40,6 +39,7 @@ def main():
     logging.info("Loading {} dataset".format(args.dataset))
     start = time()
     dataset = Taobao(args.data_dir)
+    # sampler = WeightedSampler(dataset.num_users, dataset.num_items, args.num_negatives, dataset.train_edge_index, args.batch_size)
     sampler = BaseSampler(dataset.num_users, dataset.num_items, args.num_negatives, dataset.train_edge_index, args.batch_size)
     valid_set = dataset.valid_set
     test_set = dataset.test_set
@@ -62,9 +62,11 @@ def main():
 
     logging.info("Start training")
     for epoch in range(args.epochs):
-        train_loss = train(train_loader, model, optimizer, args.num_negatives)
+        # train_loss = train(train_loader, model, optimizer, args.num_negatives)
+        train_loader = sampler.get_data_loader()
+        train_loss = train_1(train_loader, model, optimizer)
         logging.info("Epoch {} | average train loss: {:.4f}".format(epoch, train_loss))
-        # valid_metrics = evaluate(dataset.valid_dict, dataset.user_item_csr, model, args.k_list, split="valid")
+        # valid_metrics = evaluate(valid_set, dataset.user_item_csr, model, args.k_list, split="valid")
 
         if (epoch + 1) % args.eval_freq == 0:
             valid_metrics = evaluate(valid_set, dataset.user_item_csr, model, args.k_list, split="valid")
@@ -113,6 +115,33 @@ def main():
         wandb.run.summary.update(test_metrics)
 
 
+def train_1(train_loader, model, optimizer):
+    """
+
+    :param train_loader: DataLoader
+    :param model: 
+    :param optimizer: 
+    :return:
+    """
+    train_loss = AverageRecord()
+    model.cuda()
+    model.train()
+    with tqdm(total=len(train_loader)) as bar:
+        for users, pos_items, neg_item_list in train_loader:
+            # compute loss
+            loss = model.margin_loss_1(users, pos_items, neg_item_list)
+            # compute gradient
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            # record loss and update progress bar
+            train_loss.update(loss.item())
+            bar.update(1)
+            bar.set_postfix_str("train loss: {:.4f}".format(loss.item()))
+
+    return train_loss.avg
+
+
 def train(train_loader, model, optimizer, num_negatives=1):
     """
 
@@ -122,13 +151,12 @@ def train(train_loader, model, optimizer, num_negatives=1):
     :return:
     """
     train_loss = AverageRecord()
-    # train_loader = sampler.get_data_loader()
     model.cuda()
     model.train()
     with tqdm(total=len(train_loader)) as bar:
         for users, pos_items in train_loader:
             # compute loss
-            loss = model.loss(users, pos_items, num_negatives)
+            loss = model.margin_loss(users, pos_items, num_negatives)
             # compute gradient
             optimizer.zero_grad()
             loss.backward()

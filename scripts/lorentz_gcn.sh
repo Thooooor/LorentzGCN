@@ -12,8 +12,8 @@ python main.py \
     --epochs 500 \
     --patience 5 \
     --eval_freq 5 \
-    --num_negatives 3 \
-    --batch_size 1024 \
+    --num_negatives 1 \
+    --batch_size 512 \
     --optimizer rsgd \
     --lr 0.001 \
     --weight_decay 0.003 \

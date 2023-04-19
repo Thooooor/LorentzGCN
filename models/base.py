@@ -20,7 +20,8 @@ class Base(torch.nn.Module):
         self.num_layers = args.num_layers
         self.margin = args.margin
         self.embedding = torch.nn.Embedding(num_embeddings=self.num_nodes, embedding_dim=self.embedding_dim).cuda()
-        self.probs_matrix = torch.zeros((self.num_users, self.num_items), requires_grad=False)
+        self.probs_matrix = torch.zeros((self.num_users, self.num_items))
+        self.neg_items_list = None
         self.reset_parameters(args.scale)
         
     def reset_parameters(self, scale):
@@ -155,8 +156,34 @@ class Base(torch.nn.Module):
         pos_item_embedding = out[pos_items]
         pos_scores = self.score_function(user_embedding, pos_item_embedding)
         
-        # neg_items_list = self.structured_negative_sampling(users, pos_items, num_negatives)
-        neg_items_list = self.weighted_negative_sampling(users, pos_items, num_negatives)
+        neg_items_list = self.structured_negative_sampling(users, pos_items, num_negatives)
+        
+        neg_scores_list = []
+        for i in range(num_negatives):
+            neg_item_embedding = out[neg_items_list[:, i]]
+            neg_scores_list.append(self.score_function(user_embedding, neg_item_embedding))
+        neg_scores = torch.stack(neg_scores_list, dim=1)
+        neg_scores = torch.mean(neg_scores, dim=1)
+        
+        loss = pos_scores - neg_scores + margin
+        loss[loss < 0] = 0
+        return loss.sum()
+    
+    def margin_loss_1(self, users, pos_items, neg_items_list, margin: float = 0.1):
+        """
+        Margin-based loss.
+        :param edge_index: [2, num_edges]
+        :param neg_edge_index: [2, num_edges]
+        :param margin: float
+        :return: float
+        """
+        out = self.compute_embedding()
+        
+        user_embedding = out[users]
+        pos_item_embedding = out[pos_items]
+        pos_scores = self.score_function(user_embedding, pos_item_embedding)
+        
+        num_negatives = neg_items_list.shape[1]
         neg_scores_list = []
         for i in range(num_negatives):
             neg_item_embedding = out[neg_items_list[:, i]]
@@ -186,6 +213,6 @@ class Base(torch.nn.Module):
             probs = scores.detach().cpu().numpy() * -1
             probs_matrix[user] = np.reshape(probs, [-1, ])
         
-        self.probs_matrix = probs_matrix
+        self.probs_matrix = torch.tensor(probs_matrix)
         
         return probs_matrix
